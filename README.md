@@ -17,7 +17,7 @@ Use the automated installer script for the easiest setup:
 
 ```bash
 git clone https://github.com/F1r3d3v/BetterScreenshareAudio.git
-./install.sh
+cd BetterScreenshareAudio && ./install.sh
 ```
 
 The installer will:
