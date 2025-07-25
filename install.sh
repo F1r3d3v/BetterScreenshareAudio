@@ -2,11 +2,17 @@
 
 # BetterDiscord Installation Script
 # Author: F1r3d3v
-# Description: Automated installer for BetterDiscord with Discord version selection
+# Description: Automated installer for BetterDiscord with Discord version selection and silent install support
 
 set -e  # Exit on any error
 
 readonly SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+# Global variables for silent mode
+SILENT_MODE=false
+DEFAULT_DISCORD_VERSION="stable"
+AUTO_CLOSE_DISCORD=false
+SKIP_PLUGIN_ON_MISSING=false
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -17,6 +23,75 @@ readonly PURPLE='\033[0;35m'
 readonly CYAN='\033[0;36m'
 readonly WHITE='\033[1;37m'
 readonly NC='\033[0m' # No Color
+
+# Function to display help
+display_help() {
+    echo "BetterDiscord Installation Script"
+    echo ""
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -s, --silent              Run in silent mode (no prompts)"
+    echo "  -v, --version VERSION     Discord version to install (stable, canary, ptb)"
+    echo "                           Default: stable"
+    echo "  -c, --close-discord       Automatically close Discord after installation"
+    echo "  -p, --skip-plugin         Skip plugin installation if not found"
+    echo "  -h, --help               Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                       Interactive installation"
+    echo "  $0 --silent              Silent installation with stable Discord"
+    echo "  $0 -s -v canary -c       Silent install Canary version and close Discord"
+    echo "  $0 --silent --version ptb --skip-plugin"
+    echo "                           Silent install PTB, skip plugin if missing"
+    echo ""
+}
+
+# Function to parse command line arguments
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -s|--silent)
+                SILENT_MODE=true
+                shift
+                ;;
+            -v|--version)
+                if [[ -n $2 && $2 != -* ]]; then
+                    case $2 in
+                        stable|canary|ptb)
+                            DEFAULT_DISCORD_VERSION="$2"
+                            shift 2
+                            ;;
+                        *)
+                            echo "Error: Invalid Discord version '$2'. Valid options: stable, canary, ptb"
+                            exit 1
+                            ;;
+                    esac
+                else
+                    echo "Error: --version requires a value (stable, canary, ptb)"
+                    exit 1
+                fi
+                ;;
+            -c|--close-discord)
+                AUTO_CLOSE_DISCORD=true
+                shift
+                ;;
+            -p|--skip-plugin)
+                SKIP_PLUGIN_ON_MISSING=true
+                shift
+                ;;
+            -h|--help)
+                display_help
+                exit 0
+                ;;
+            *)
+                echo "Error: Unknown option '$1'"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+}
 
 # ASCII Art
 display_ascii_art() {
@@ -51,6 +126,9 @@ display_actions() {
     echo -e "${WHITE}  4. ${BLUE}Let you choose Discord version (Normal/Canary/PTB)${NC}"
     echo -e "${WHITE}  5. ${BLUE}Install BetterDiscord for your chosen version${NC}"
     echo -e "${WHITE}  6. ${BLUE}Copy BetterScreenshareAudio plugin to BetterDiscord${NC}"
+    echo ""
+    echo -e "${CYAN}💡 Tip: Use --silent flag for automated installation${NC}"
+    echo -e "${CYAN}   Use --help to see all available options${NC}"
     echo ""
     echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
     echo ""
@@ -90,27 +168,42 @@ clone_repository() {
             echo -e "${YELLOW}🔄 The repository directory may be corrupted or not a valid git repository.${NC}"
             echo -e "${YELLOW}⚠️  To fix this, the existing directory needs to be removed and re-cloned.${NC}"
             echo ""
-            read -p "$(echo -e ${CYAN}Do you want to remove the existing directory and re-clone? [y/N]: ${NC})" remove_confirm
-            case $remove_confirm in
-                [Yy]*)
-                    echo -e "${CYAN}🗑️  Removing existing directory...${NC}"
-                    cd ..
-                    rm -rf "$repo_dir"
-                    
-                    if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
-                        echo -e "${GREEN}✅ Repository cloned successfully${NC}"
-                        cd "$repo_dir"
-                    else
-                        echo -e "${RED}❌ Failed to clone repository${NC}"
-                        exit 1
-                    fi
-                    ;;
-                *)
-                    echo -e "${RED}❌ Cannot proceed without a clean repository${NC}"
-                    echo -e "${YELLOW}Please manually fix the repository or remove the directory and run the script again.${NC}"
+            
+            if [ "$SILENT_MODE" = true ]; then
+                echo -e "${CYAN}🗑️  Removing existing directory (silent mode)...${NC}"
+                cd ..
+                rm -rf "$repo_dir"
+                
+                if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
+                    echo -e "${GREEN}✅ Repository cloned successfully${NC}"
+                    cd "$repo_dir"
+                else
+                    echo -e "${RED}❌ Failed to clone repository${NC}"
                     exit 1
-                    ;;
-            esac
+                fi
+            else
+                read -p "$(echo -e ${CYAN}Do you want to remove the existing directory and re-clone? [y/N]: ${NC})" remove_confirm
+                case $remove_confirm in
+                    [Yy]*)
+                        echo -e "${CYAN}🗑️  Removing existing directory...${NC}"
+                        cd ..
+                        rm -rf "$repo_dir"
+                        
+                        if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
+                            echo -e "${GREEN}✅ Repository cloned successfully${NC}"
+                            cd "$repo_dir"
+                        else
+                            echo -e "${RED}❌ Failed to clone repository${NC}"
+                            exit 1
+                        fi
+                        ;;
+                    *)
+                        echo -e "${RED}❌ Cannot proceed without a clean repository${NC}"
+                        echo -e "${YELLOW}Please manually fix the repository or remove the directory and run the script again.${NC}"
+                        exit 1
+                        ;;
+                esac
+            fi
         fi
     else
         echo -e "${CYAN}📥 Cloning BetterDiscord repository...${NC}"
@@ -141,6 +234,29 @@ install_dependencies() {
 
 # Function to choose Discord version
 choose_discord_version() {
+    if [ "$SILENT_MODE" = true ]; then
+        # Set version based on DEFAULT_DISCORD_VERSION
+        case $DEFAULT_DISCORD_VERSION in
+            stable)
+                DISCORD_VERSION="stable"
+                INSTALL_COMMAND="pnpm run install-stable"
+                VERSION_NAME="Normal Discord"
+                ;;
+            canary)
+                DISCORD_VERSION="canary"
+                INSTALL_COMMAND="pnpm run install-canary"
+                VERSION_NAME="Discord Canary"
+                ;;
+            ptb)
+                DISCORD_VERSION="ptb"
+                INSTALL_COMMAND="pnpm run install-ptb"
+                VERSION_NAME="Discord PTB"
+                ;;
+        esac
+        echo -e "${GREEN}✅ Selected: ${VERSION_NAME} (silent mode)${NC}"
+        return
+    fi
+    
     echo ""
     echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${YELLOW}🎯 Choose your Discord version:${NC}"
@@ -208,18 +324,28 @@ copy_plugin() {
         echo -e "${YELLOW}⚠️  Plugin file '$plugin_filename' not found in current directory.${NC}"
         echo -e "${WHITE}Please make sure '$plugin_filename' is in the same directory as this script.${NC}"
         
-        read -p "$(echo -e ${CYAN}Do you want to continue without copying the plugin? [y/N]: ${NC})" skip_plugin
-        case $skip_plugin in
-            [Yy]*)
-                echo -e "${YELLOW}⏭️  Skipping plugin installation...${NC}"
+        if [ "$SILENT_MODE" = true ]; then
+            if [ "$SKIP_PLUGIN_ON_MISSING" = true ]; then
+                echo -e "${YELLOW}⏭️  Skipping plugin installation (silent mode)...${NC}"
                 return 0
-                ;;
-            *)
-                echo -e "${RED}❌ Cannot proceed without the plugin file${NC}"
-                echo -e "${YELLOW}Please place '$plugin_filename' in the same directory as this script and run again.${NC}"
+            else
+                echo -e "${RED}❌ Cannot proceed without the plugin file (silent mode)${NC}"
                 exit 1
-                ;;
-        esac
+            fi
+        else
+            read -p "$(echo -e ${CYAN}Do you want to continue without copying the plugin? [y/N]: ${NC})" skip_plugin
+            case $skip_plugin in
+                [Yy]*)
+                    echo -e "${YELLOW}⏭️  Skipping plugin installation...${NC}"
+                    return 0
+                    ;;
+                *)
+                    echo -e "${RED}❌ Cannot proceed without the plugin file${NC}"
+                    echo -e "${YELLOW}Please place '$plugin_filename' in the same directory as this script and run again.${NC}"
+                    exit 1
+                    ;;
+            esac
+        fi
     fi
     
     # Copy the plugin file
@@ -245,19 +371,31 @@ prompt_discord_restart() {
         echo -e "${WHITE}To complete the installation, please restart Discord.${NC}"
         echo ""
         
-        read -p "$(echo -e ${CYAN}Would you like to close Discord now? [y/N]: ${NC})" close_discord
-        case $close_discord in
-            [Yy]*)
-                echo -e "${CYAN}🔄 Closing Discord...${NC}"
+        if [ "$SILENT_MODE" = true ]; then
+            if [ "$AUTO_CLOSE_DISCORD" = true ]; then
+                echo -e "${CYAN}🔄 Closing Discord (silent mode)...${NC}"
                 pkill -f "discord" 2>/dev/null || true
                 sleep 2
                 echo -e "${GREEN}✅ Discord closed${NC}"
                 echo -e "${WHITE}You can now start Discord to use BetterDiscord.${NC}"
-                ;;
-            *)
-                echo -e "${YELLOW}👍 Please manually restart Discord when you're ready.${NC}"
-                ;;
-        esac
+            else
+                echo -e "${YELLOW}👍 Please manually restart Discord when you're ready (silent mode).${NC}"
+            fi
+        else
+            read -p "$(echo -e ${CYAN}Would you like to close Discord now? [y/N]: ${NC})" close_discord
+            case $close_discord in
+                [Yy]*)
+                    echo -e "${CYAN}🔄 Closing Discord...${NC}"
+                    pkill -f "discord" 2>/dev/null || true
+                    sleep 2
+                    echo -e "${GREEN}✅ Discord closed${NC}"
+                    echo -e "${WHITE}You can now start Discord to use BetterDiscord.${NC}"
+                    ;;
+                *)
+                    echo -e "${YELLOW}👍 Please manually restart Discord when you're ready.${NC}"
+                    ;;
+            esac
+        fi
     fi
 }
 
@@ -281,21 +419,33 @@ display_completion() {
 
 # Main execution
 main() {
-    # Clear screen and display ASCII art
-    clear
-    display_ascii_art
-    display_actions
+    # Parse command line arguments
+    parse_arguments "$@"
     
-    # Confirm before proceeding
-    read -p "$(echo -e ${CYAN}Do you want to proceed with the installation? [Y/n]: ${NC})" confirm
-    case $confirm in
-        [Nn]*)
-            echo -e "${YELLOW}Installation cancelled.${NC}"
-            exit 0
-            ;;
-    esac
+    # In silent mode, skip ASCII art and interactive prompts
+    if [ "$SILENT_MODE" = true ]; then
+        echo -e "${WHITE}🎮 BetterDiscord Automated Installer (Silent Mode) 🎮${NC}"
+        echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
+        echo -e "${CYAN}Running in silent mode with Discord version: ${DEFAULT_DISCORD_VERSION}${NC}"
+        echo ""
+    else
+        # Clear screen and display ASCII art
+        clear
+        display_ascii_art
+        display_actions
+        
+        # Confirm before proceeding
+        read -p "$(echo -e ${CYAN}Do you want to proceed with the installation? [Y/n]: ${NC})" confirm
+        case $confirm in
+            [Nn]*)
+                echo -e "${YELLOW}Installation cancelled.${NC}"
+                exit 0
+                ;;
+        esac
+        
+        echo ""
+    fi
     
-    echo ""
     echo -e "${PURPLE}═══════════════════════════════════════════════════════════════${NC}"
     
     # Execute installation steps
