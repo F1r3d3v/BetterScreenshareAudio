@@ -2,7 +2,7 @@
  * @name BetterScreenshareAudio
  * @author F1r3d3v
  * @authorLink https://github.com/F1r3d3v
- * @version 1.0.0
+ * @version 1.0.1
  * @source https://github.com/F1r3d3v/BetterScreenshareAudio
  * @description Choose the audio sources for the screenshare on Linux. Requires fork of BetterDiscord to work.
  */
@@ -12,6 +12,7 @@ const { Webpack, Patcher, React, Logger, Data, Components, Plugins } = BdApi;
 const Dispatcher = Webpack.getByKeys("subscribe", "dispatch");
 const UserStore = Webpack.getStore("UserStore");
 const TextClasses = Webpack.getByKeys("errorMessage", "h5");
+const DivClasses = Webpack.getByKeys("labelContainer");
 const Utilities = Webpack.getByKeys("getAudioPid", "getPidFromDesktopSource", "getDesktopSourceFromPid");
 
 const fs = require("fs");
@@ -48,7 +49,7 @@ module.exports = class BetterScreenshareAudio {
     async customAudioSource() {
         // Wait for the modal to appear, then get the necessary modules
         if (!this.ModulesInitialized) {
-            await Webpack.waitForModule(Webpack.Filters.byStrings("onChangeSound", "onChangePreviewDisabled"));
+            await Webpack.waitForModule(Webpack.Filters.byStrings("StreamSettings: user cannot be undefined"));
 
             this.GoLiveModalMod = Webpack.getMangled("showRefreshedGoLiveModal", {
                 GoLiveModal: Webpack.Filters.byStrings("showRefreshedGoLiveModal")
@@ -57,8 +58,6 @@ module.exports = class BetterScreenshareAudio {
             this.StreamSettingsPanelMod = Webpack.getMangled(/onChangeSound:.{1,3},onChangePreviewDisabled:.{1,3}/, {
                 GoLiveModal: x => x
             });
-
-            this.FormModalClasses = Webpack.getByKeys("formItemTitleSlim", "modalContent");
 
             this.ModulesInitialized = true;
         }
@@ -116,7 +115,7 @@ module.exports = class BetterScreenshareAudio {
             const baseFun = ret.props.children[0].props.children[2].type;
             let hook = (args) => {
                 let ret = baseFun(args);
-                const isScreenshareAudio = ret.props.children.props.value
+                const isScreenshareAudio = ret.props.children.props.checked
                 if (isScreenshareAudio && activeSlide == 3) {
                     if (ret?.props?.children) {
                         if (!Array.isArray(ret.props.children))
@@ -162,10 +161,18 @@ module.exports = class BetterScreenshareAudio {
                             const [options, setOptions] = React.useState(getOptions());
 
                             return React.createElement("div", {
+                                style: { marginTop: "20px" },
                                 children: [
-                                    React.createElement("h1", {
-                                        children: "Audio Source",
-                                        className: `${TextClasses.h5} ${TextClasses.eyebrow} ${this.FormModalClasses.formItemTitleSlim}`
+                                    React.createElement("div", { 
+                                        className: DivClasses.labelContainer,
+                                        style: { marginBottom: "8px" },
+                                        children: [
+                                            React.createElement("label", {
+                                                children: "Audio Source",
+                                                className: `${TextClasses.defaultColor} ${TextClasses['text-md/medium']} ${TextClasses.label}`,
+                                                "data-text-variant": "text-md/medium",
+                                            }),
+                                        ],
                                     }),
                                     React.createElement(Components.DropdownMultiple, {
                                         values: audioSource,
@@ -198,9 +205,10 @@ module.exports = class BetterScreenshareAudio {
                                                     settings.useBuildInSoundshare = value;
                                                     Data.save(this.meta.name, "settings", settings);
                                                 },
-                                            })],
-                                    })
-                                ]
+                                            }),
+                                        ],
+                                    }),
+                                ],
                             });
                         }
 
