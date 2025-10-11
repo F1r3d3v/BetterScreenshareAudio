@@ -16,8 +16,7 @@ A BetterDiscord plugin that enhances screenshare audio on Linux by allowing you 
 Use the automated installer script for the easiest setup:
 
 ```bash
-git clone https://github.com/F1r3d3v/BetterScreenshareAudio.git
-cd BetterScreenshareAudio && ./install.sh
+bash <(curl -s https://raw.githubusercontent.com/F1r3d3v/BetterScreenshareAudio/master/install.sh)
 ```
 
 The installer will:
@@ -39,7 +38,7 @@ The installer will:
 
 1. **Install the BetterDiscord Fork**:
    ```bash
-   git clone https://github.com/F1r3d3v/BetterDiscord
+   git clone --depth 1 --branch main --single-branch --recurse-submodules https://github.com/F1r3d3v/BetterDiscord
    cd BetterDiscord
    pnpm install
    pnpm run install-stable  # or install-canary, install-ptb
