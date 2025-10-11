@@ -154,7 +154,7 @@ check_pnpm() {
 # Function to clone repository
 clone_repository() {
     local repo_url="https://github.com/F1r3d3v/BetterDiscord"
-    local repo_dir="BetterDiscord"
+    local repo_dir="$HOME/.cache/BetterDiscord"
     
     if [ -d "$repo_dir" ]; then
         echo -e "${YELLOW}📁 Directory '$repo_dir' already exists.${NC}"
@@ -174,7 +174,7 @@ clone_repository() {
                 cd ..
                 rm -rf "$repo_dir"
                 
-                if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
+                if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url" "$repo_dir"; then
                     echo -e "${GREEN}✅ Repository cloned successfully${NC}"
                     cd "$repo_dir"
                 else
@@ -189,7 +189,7 @@ clone_repository() {
                         cd ..
                         rm -rf "$repo_dir"
                         
-                        if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
+                        if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url" "$repo_dir"; then
                             echo -e "${GREEN}✅ Repository cloned successfully${NC}"
                             cd "$repo_dir"
                         else
@@ -209,7 +209,7 @@ clone_repository() {
         echo -e "${CYAN}📥 Cloning BetterDiscord repository...${NC}"
         echo -e "${WHITE}Repository: ${repo_url}${NC}"
         
-        if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url"; then
+        if git clone --depth 1 --branch main --single-branch --recurse-submodules "$repo_url" "$repo_dir"; then
             echo -e "${GREEN}✅ Repository cloned successfully${NC}"
             cd "$repo_dir"
         else
@@ -309,20 +309,31 @@ install_betterdiscord() {
     fi
 }
 
-# Function to copy BetterScreenshareAudio plugin
+# Function to download BetterScreenshareAudio plugin
 copy_plugin() {
     local plugin_filename="BetterScreenshareAudio.plugin.js"
-    local plugin_path="${SCRIPT_DIR}/${plugin_filename}"
+    local plugin_url="https://raw.githubusercontent.com/F1r3d3v/BetterScreenshareAudio/master/${plugin_filename}"
     local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
     local bd_plugins_dir="$config_dir/BetterDiscord/plugins"
     
     echo ""
-    echo -e "${CYAN}📁 Copying BetterScreenshareAudio plugin...${NC}"
+    echo -e "${CYAN}📁 Downloading BetterScreenshareAudio plugin...${NC}"
     
-    # Check if plugin file exists in current directory
-    if [ ! -f "$plugin_path" ]; then
-        echo -e "${YELLOW}⚠️  Plugin file '$plugin_filename' not found in current directory.${NC}"
-        echo -e "${WHITE}Please make sure '$plugin_filename' is in the same directory as this script.${NC}"
+    # Create plugins directory if it doesn't exist
+    if [ ! -d "$bd_plugins_dir" ]; then
+        echo -e "${CYAN}📁 Creating BetterDiscord plugins directory...${NC}"
+        mkdir -p "$bd_plugins_dir"
+    fi
+    
+    # Download the plugin file
+    echo -e "${CYAN}📋 Downloading plugin from remote repository...${NC}"
+    echo -e "${WHITE}Source: $plugin_url${NC}"
+    echo -e "${WHITE}Destination: $bd_plugins_dir/$plugin_filename${NC}"
+    
+    if curl -fs "$plugin_url" -o "$bd_plugins_dir/$plugin_filename"; then
+        echo -e "${GREEN}✅ Plugin downloaded successfully${NC}"
+    else
+        echo -e "${RED}❌ Failed to download plugin${NC}"
         
         if [ "$SILENT_MODE" = true ]; then
             if [ "$SKIP_PLUGIN_ON_MISSING" = true ]; then
@@ -333,31 +344,19 @@ copy_plugin() {
                 exit 1
             fi
         else
-            read -p "$(echo -e ${CYAN}Do you want to continue without copying the plugin? [y/N]: ${NC})" skip_plugin
+            read -p "$(echo -e ${CYAN}Do you want to continue without the plugin? [y/N]: ${NC})" skip_plugin
             case $skip_plugin in
                 [Yy]*)
                     echo -e "${YELLOW}⏭️  Skipping plugin installation...${NC}"
                     return 0
                     ;;
                 *)
-                    echo -e "${RED}❌ Cannot proceed without the plugin file${NC}"
-                    echo -e "${YELLOW}Please place '$plugin_filename' in the same directory as this script and run again.${NC}"
+                    echo -e "${RED}❌ Installation failed${NC}"
+                    echo -e "${YELLOW}Please check your internet connection and try again.${NC}"
                     exit 1
                     ;;
             esac
         fi
-    fi
-    
-    # Copy the plugin file
-    echo -e "${CYAN}📋 Copying plugin to BetterDiscord...${NC}"
-    echo -e "${WHITE}Source: $plugin_path${NC}"
-    echo -e "${WHITE}Destination: $bd_plugins_dir/$plugin_filename${NC}"
-    
-    if cp "$plugin_path" "$bd_plugins_dir/"; then
-        echo -e "${GREEN}✅ Plugin copied successfully${NC}"
-    else
-        echo -e "${RED}❌ Failed to copy plugin${NC}"
-        echo -e "${YELLOW}You may need to copy it manually to: $bd_plugins_dir${NC}"
     fi
 }
 
